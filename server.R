@@ -198,7 +198,7 @@ shinyServer(function(input, output,session) {
          sama sektori, sama EMTAK2 taseme, sama maakonna (ja nt naabermaakondade), 
          aastase käibe ja/või aasta keskmise töötajate arvu järgi. Käibe ja töötajate 
          arvu korral saab valida ka võrreldav aasta. <br/>
-         Kui on määratud sarnased ettevõttete nõuded, siis rakendus annab 
+         Kui on määratud sarnased ettevõtete nõuded, siis rakendus annab 
          sarnaste ettevõtete nimed ning joonistab graafikud valitud ettevõtte ja
          sarnaste ettevõtete keskmistest näitajatest.")
   })
