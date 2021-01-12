@@ -8,6 +8,8 @@ library(dplyr)
 library(shinyWidgets)
 library(zoo)
 library(plotly)
+library(shinycssloaders)
+
 
 #andmed
 load("andmed/andmed_filter.RData")

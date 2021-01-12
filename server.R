@@ -90,19 +90,18 @@ shinyServer(function(input, output,session) {
         h3("Sarnased ettevõtted"),
         htmlOutput("nimekiri"),
         br(),
-        p("Vaata ettevõtteid lähemalt ",
-          a("ajaloo võrdluse rakendusest", href="https://annegrete.ee/shiny/benchmarking_EMTA/", target="_blank"),"."),
+        htmlOutput("bench"),
         hr(),
-        plotlyOutput("jooniskaive"),
-        plotlyOutput("joonistootajad"),
-        plotlyOutput("jooniskaive_tootaja"),
-        plotlyOutput("joonistmaksud_tootaja"),
-        plotlyOutput("joonisrmaksud_kaive"),
-        plotlyOutput("joonistmaksud_kaive"),
-        plotlyOutput("joonisrmaksud"),
-        plotlyOutput("joonistmaksud"),
+        shinycssloaders::withSpinner(plotlyOutput("jooniskaive")),
+        shinycssloaders::withSpinner(plotlyOutput("joonistootajad")),
+        shinycssloaders::withSpinner(plotlyOutput("jooniskaive_tootaja")),
+        shinycssloaders::withSpinner(plotlyOutput("joonistmaksud_tootaja")),
+        shinycssloaders::withSpinner(plotlyOutput("joonisrmaksud_kaive")),
+        shinycssloaders::withSpinner(plotlyOutput("joonistmaksud_kaive")),
+        shinycssloaders::withSpinner(plotlyOutput("joonisrmaksud")),
+        shinycssloaders::withSpinner(plotlyOutput("joonistmaksud")),
         htmlOutput("seletus")
-      )
+        )
     })
   })
   
@@ -202,7 +201,19 @@ shinyServer(function(input, output,session) {
   })
   
   output$nimekiri <- renderUI({
-    HTML(paste(sarnased_reg()$nimi, collapse = "<br/>"))
+    tekst <- NULL
+    if (nrow(sarnased_reg()) == 0) {
+      tekst <- "Sellistel tingimustel sarnaseid ei leitud."
+    } else {
+      tekst <- paste(sarnased_reg()$nimi, collapse = "<br/>")
+    }
+    HTML(tekst)
+  })
+  
+  output$bench <- renderUI({
+    if (nrow(sarnased_reg()) != 0) {
+    HTML("Vaata ettevõtteid lähemalt <a href='https://annegrete.ee/shiny/benchmarking_EMTA/' target='_blank'>ajaloo võrdluse rakendusest</a>.")
+    }
   })
   
   # Joonised ----------------------------------------------------------------
