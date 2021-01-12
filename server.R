@@ -187,19 +187,17 @@ shinyServer(function(input, output,session) {
   
   output$seletus <- renderUI({
     HTML("<h3> Lisainfo</h3><br/>
-    Selles rakendused saab valida äriühingutest ettevõtte, mis deklareeris käivet/töötajaid 
+    Selles rakenduses saab valida äriühingutest ettevõtte, mis deklareeris käivet/töötajaid 
          detsember 2019 - november 2020 (2020 I - IV kvartal 
          <a href = 'http://www.emta.ee/et/kontaktid-ja-ametist/maksulaekumine-statistika/tasutud-maksud-kaive-ja-tootajate-arv' target='_blank'>EMTA andmetes</a>). 
          EMTA andmetele on lisatud 
          <a href='https://www.stat.ee/et/esita-andmeid/andmete-esitamisest/ettevotete-uuringud/majandusuksuste-klassifitseerimise-abiinfo' target='_blank'>Statistikaametist</a> 
          (01.12.2020 seis) ettevõtete sektor ja EMTAK2 tase. Kui Statistikameti andmetes 
          ei ole seda ettevõtet, siis EMTAK2 on puudu ja sektor on võetud EMTA andmetest. <br/>
-         Ettevõttele saab otsida enda sarnaseid ettevõtteid. Sarnasust saab defineerida 
-         sama sektori, sama EMTAK2 taseme, sama maakonna (ja nt naabermaakondade), 
-         aastase käibe ja/või aasta keskmise töötajate arvu järgi. Käibe ja töötajate 
-         arvu korral saab valida ka võrreldav aasta. <br/>
-         Kui on määratud sarnased ettevõtete nõuded, siis rakendus annab 
-         sarnaste ettevõtete nimed ning joonistab graafikud valitud ettevõtte ja
+         Valitud ettevõttele saab otsida sarnaseid ettevõtteid. Sarnasust saab defineerida 
+         sektori, EMTAK2 taseme, maakonna, aastase käibe ja/või aasta keskmise töötajate arvu järgi. Käibe ja töötajate 
+         arvu korral saab valida ka võrreldava aasta. <br/>
+         Rakendus annab sarnaste ettevõtete nimed ning joonistab graafikud valitud ettevõtte ja
          sarnaste ettevõtete keskmistest näitajatest.")
   })
   
