@@ -1,347 +1,281 @@
-#server.R
+# server.R
 
-shinyServer(function(input, output,session) {
-  
-  # UI ----------------------------------------------------------------------
-  
-  USER <- reactiveValues(Logged = FALSE)
-  
-  ui1 <- function(){
-    tagList(
-      div(id = "login",
-          wellPanel(style = "position: absolute; width: 45%; left: 11%; box-shadow: 10px 10px 15px grey;",
-                    selectizeInput("ID", "Vali ettevõte:", NULL),
-                    actionButton("submit", "Edasi")))
-    )}
-  
-  observe({ 
-    if (USER$Logged == FALSE) {
-      if (!is.null(input$ID)) {
-        if (input$submit > 0) {
-          USER$Logged <- TRUE
-        }
-      }
-    }
-  })
-  
-  mina_koond <- reactive({
-    andmed_filter %>% 
-      filter(nimi == input$ID, aasta == ifelse(is.null(input$aasta), 2020, input$aasta))
-  })
-  
+shinyServer(function(input, output, session) {
+
+  # ---- company selector ----------------------------------------------------
   observe({
-    if (USER$Logged == FALSE) {
-      updateSelectizeInput(session = session, inputId = 'ID', choices = c('', ettevotted), 
-                           server = TRUE, 
-                           options = list(onDropdownOpen = I('function() {this.clear();}'))
+    updateSelectizeInput(
+      session = session,
+      inputId = "company_id",
+      choices = setNames(ettevotted$value, ettevotted$label),
+      server = TRUE,
+      options = list(
+        placeholder = "Alusta ettevõtte nime kirjutamist...",
+        maxItems = 1,
+        onDropdownOpen = I("function() {this.clear();}")
       )
-      output$page <- renderUI({
-        shinyjs::addCssClass(selector = "form.well", class = "hidden")
-        div(class = "outer",do.call(bootstrapPage,c("",ui1())))#)
-      })
-    }
-    if (USER$Logged == TRUE) {
-      shinyjs::removeCssClass(selector = "form.well", class = "hidden")
-      output$side <- renderUI({
-        maakond1 <- isolate(mina_koond()$maakond)
-        plusmiinus <- "\u00b1"
-        Encoding(plusmiinus) <- "UTF-8"
-        if (is.na(maakond1)) {
-          maakonnad1 <- maakonnad
-        } else {
-          maakonnad1 <- maakonnad[maakonnad != maakond1]
-        }
-        aastad <- andmed_filter %>% filter(nimi == input$ID) %>% pull(aasta)
-        tagList(
-          h2("Sarnasuse näitajad"),
-          useSweetAlert(),
-          checkboxInput("sektor", label = "Sama sektor", value = FALSE),
-          checkboxInput("emtak2", label = "Sama EMTAK2", value = FALSE),
-          checkboxInput("maakond", label = "Sama maakond", value = FALSE),
-          conditionalPanel(condition = "input.maakond == true",
-                           selectInput("maakond2", "lisa ka", maakonnad1, multiple = TRUE)),
-          checkboxInput("kaive", label = "Sarnane käive", value = FALSE),
-          conditionalPanel(condition = "input.kaive == true",
-                           numericInputIcon("dkaive", NULL, value = 20, min = 0,
-                                            max = 100, icon = list(plusmiinus, icon("percent")), 
-                                            help_text = "Arv peaks jääma 0 ja 100% vahele.")),
-          checkboxInput("tootajad", label = "Sarnane töötajate arv", value = FALSE),
-          conditionalPanel(condition = "input.tootajad == true",
-                           numericInputIcon("dtootajad", NULL, value = 20, min = 0, 
-                                            max = 100, icon = list(plusmiinus, icon("percent")), 
-                                            help_text = "Arv peaks jääma 0 ja 100% vahele.")),
-          conditionalPanel(condition = "input.kaive == true || input.tootajad == true",
-                           selectInput("aasta", "Vali võrreldav aasta", aastad, selected = 2020)),
-          actionButton("leia", "LEIA SARNASED"),
-          hr(),
-          htmlOutput("nouded")
-        )
-      })
-      output$page <- renderUI({
-        tagList(
-          htmlOutput("seletus")
-        )
-      })
-    }
+    )
   })
-  observeEvent(input$leia, {
-    output$page <- renderUI({
-      tagList(
-        h3("Sarnased ettevõtted"),
-        htmlOutput("nimekiri"),
-        br(),
-        htmlOutput("bench"),
-        hr(),
-        shinycssloaders::withSpinner(plotlyOutput("jooniskaive")),
-        shinycssloaders::withSpinner(plotlyOutput("joonistootajad")),
-        shinycssloaders::withSpinner(plotlyOutput("jooniskaive_tootaja")),
-        shinycssloaders::withSpinner(plotlyOutput("joonistmaksud_tootaja")),
-        shinycssloaders::withSpinner(plotlyOutput("joonisrmaksud_kaive")),
-        shinycssloaders::withSpinner(plotlyOutput("joonistmaksud_kaive")),
-        shinycssloaders::withSpinner(plotlyOutput("joonisrmaksud")),
-        shinycssloaders::withSpinner(plotlyOutput("joonistmaksud")),
-        htmlOutput("seletus")
-        )
-    })
-  })
-  
-  # Jooniste andmed ------------------------------------------------------------------
-  
-  sarnased_reg <- eventReactive(input$leia, {
-    #leia ettevõtted, kes on sarnased
-    andmed_temp <- andmed_filter %>% filter(registrikood != mina_koond()$registrikood, aasta == input$aasta)
-    if (input$sektor) {
-      if (!is.na(mina_koond()$emtaktahttekst)){
-        andmed_temp <- andmed_temp %>% filter(emtaktahttekst == mina_koond()$emtaktahttekst)
-      }
-    } 
-    if (input$emtak2) {
-      if (!is.na(mina_koond()$emtak2tekst)) {
-        andmed_temp <- andmed_temp %>% filter(emtak2tekst == mina_koond()$emtak2tekst)
-      }
-    }
-    if (input$maakond) {
-      if(!is.na(mina_koond()$maakond) & length(input$maakond2) != 0) {
-        andmed_temp <- andmed_temp %>% filter(maakond %in% c(mina_koond()$maakond, input$maakond2))
-      }
-    } 
-    if (input$kaive) andmed_temp <- andmed_temp %>% 
-        filter(kaive >= mina_koond()$kaive*(1-input$dkaive/100), 
-               kaive <= mina_koond()$kaive*(1+input$dkaive/100))
-    if (input$tootajad) andmed_temp <- andmed_temp %>% 
-        filter(tootajad >= mina_koond()$tootajad*(1-input$dtootajad/100), 
-               tootajad <= mina_koond()$tootajad*(1+input$dtootajad/100))
-    andmed_temp %>% select(nimi, registrikood) %>% arrange(nimi)
 
+  selected_company <- reactive({
+    req(input$company_id)
+
+    active_companies %>%
+      filter(registrikood == input$company_id) %>%
+      slice(1)
   })
-  andmed_joonis <- reactive({
-    req(sarnased_reg())
-    sarnased <- andmed_emta %>% 
-      filter(registrikood %in% sarnased_reg()$registrikood) %>% 
-      group_by(aeg) %>% 
-      summarise_at(vars(rmaksud:tootajad, rmaksud_kaive:tmaksud_tootaja), mean, na.rm = TRUE) %>% 
-      mutate(grupp = "Sarnased ettevõtted")
-    mina <- andmed_emta %>% 
-      filter(registrikood == mina_koond()$registrikood) %>% 
-      mutate(grupp = mina_koond()$nimi) %>% 
-      select(names(sarnased))
-    rbind(sarnased, mina)
+
+  selected_company_year <- reactive({
+    req(input$company_id, input$aasta)
+
+    company_year_ds %>%
+      filter(registrikood == input$company_id, aasta == input$aasta) %>%
+      collect() %>%
+      slice(1)
   })
-  
-  # Tekts outputid ----------------------------------------------------------
-  
-  output$nouded <- renderUI({
-    str <- "Ettevõtted on sarnased, kui on täidetud järgmised nõuded:"
-    if (input$sektor) {
-      if (!is.na(mina_koond()$emtaktahttekst)){
-        str <- paste(str, paste("<b>Sektor:</b>", mina_koond()$emtaktahttekst), sep = '<br/>')
-      } else {
-        str <- paste(str, "Andmetes ei ole ettevõtte <b>sektorit</b>, seda ei arvestata filtreerimisel.", sep = '<br/>')
-      }
-    } 
-    if (input$emtak2) {
-      if (!is.na(mina_koond()$emtak2tekst)) {
-        str <- paste(str, paste("<b>EMTAK2:</b>", mina_koond()$emtak2tekst), sep = '<br/>')
-      } else {
-        str <- paste(str, "Andmetes ei ole ettevõtte <b>EMTAK2</b>, seda ei arvestata filtreerimisel.", sep = '<br/>')
-      }
-    }
-    if (input$maakond) {
-      if(!is.na(mina_koond()$maakond)) {
-        str <- paste(str, paste("<b>Maakond:</b>", paste(c(mina_koond()$maakond, input$maakond2), collapse = " ")), sep = '<br/>')
-      } else {
-        str <- paste(str, "Andmetes ei ole ettevõtte <b>maakonda</b>, filtreerimisel arvestatakse ainult lisatud maakondi.", sep = '<br/>')
-      }
-    } 
-    if(input$kaive) str <- paste(str, paste("<b>Käive:</b>", 
-                                            paste(prettyNum(mina_koond()$kaive*(1-input$dkaive/100), big.mark = " "), 
-                                                  prettyNum(mina_koond()$kaive*(1+input$dkaive/100), big.mark = " "), sep = " - ")), sep = '<br/>')
-    if(input$tootajad) str <- paste(str, paste("<b>Töötajad:</b>",
-                                               paste(mina_koond()$tootajad*(1-input$dtootajad/100), 
-                                                     mina_koond()$tootajad*(1+input$dtootajad/100), sep = " - ")), sep = '<br/>')
-    if(input$kaive | input$tootajad) str <- paste(str, paste("Võrdlusaastaks on", input$aasta), sep = '<br/>')
-    
-    HTML(str)
-  })
-  
-  output$seletus <- renderUI({
-    HTML("<h3> Lisainfo</h3><br/>
-    Selles rakenduses saab valida äriühingutest ettevõtte, mis deklareeris käivet/töötajaid 
-         detsember 2019 - november 2020 (2020 I - IV kvartal 
-         <a href = 'http://www.emta.ee/et/kontaktid-ja-ametist/maksulaekumine-statistika/tasutud-maksud-kaive-ja-tootajate-arv' target='_blank'>EMTA andmetes</a>). 
-         EMTA andmetele on lisatud 
-         <a href='https://www.stat.ee/et/esita-andmeid/andmete-esitamisest/ettevotete-uuringud/majandusuksuste-klassifitseerimise-abiinfo' target='_blank'>Statistikaametist</a> 
-         (01.12.2020 seis) ettevõtete sektor ja EMTAK2 tase. Kui Statistikameti andmetes 
-         ei ole seda ettevõtet, siis EMTAK2 on puudu ja sektor on võetud EMTA andmetest. <br/>
-         Valitud ettevõttele saab otsida sarnaseid ettevõtteid. Sarnasust saab defineerida 
-         sektori, EMTAK2 taseme, maakonna, aastase käibe ja/või aasta keskmise töötajate arvu järgi. Käibe ja töötajate 
-         arvu korral saab valida ka võrreldava aasta. <br/>
-         Rakendus annab sarnaste ettevõtete nimed ning joonistab graafikud valitud ettevõtte ja
-         sarnaste ettevõtete keskmistest näitajatest.")
-  })
-  
-  output$nimekiri <- renderUI({
-    tekst <- NULL
-    if (nrow(sarnased_reg()) == 0) {
-      tekst <- "Sellistel tingimustel sarnaseid ei leitud."
+
+  # ---- controls ------------------------------------------------------------
+  output$similarity_controls <- renderUI({
+    req(selected_company())
+
+    plusmiinus <- "\u00b1"
+    company_county <- selected_company()$maakond
+    extra_counties <- if (is.na(company_county) || company_county == "") {
+      maakonnad
     } else {
-      tekst <- paste(sarnased_reg()$nimi, collapse = "<br/>")
+      setdiff(maakonnad, company_county)
     }
-    HTML(tekst)
+
+    tagList(
+      h3("Sarnasuse näitajad"),
+      checkboxInput("sektor", "Sama sektor", value = FALSE),
+      checkboxInput("emtak2", "Sama EMTAK2", value = TRUE),
+      checkboxInput("maakond", "Sama maakond", value = FALSE),
+      conditionalPanel(
+        condition = "input.maakond == true",
+        selectInput("maakond2", "Lisa ka maakonnad", extra_counties, multiple = TRUE)
+      ),
+      checkboxInput("kaive", "Sarnane käive", value = TRUE),
+      conditionalPanel(
+        condition = "input.kaive == true",
+        numericInputIcon(
+          "dkaive", NULL, value = 20, min = 0, max = 100,
+          icon = list(plusmiinus, icon("percent")),
+          help_text = "Arv peaks jääma 0 ja 100% vahele."
+        )
+      ),
+      checkboxInput("tootajad", "Sarnane töötajate arv", value = TRUE),
+      conditionalPanel(
+        condition = "input.tootajad == true",
+        numericInputIcon(
+          "dtootajad", NULL, value = 20, min = 0, max = 100,
+          icon = list(plusmiinus, icon("percent")),
+          help_text = "Arv peaks jääma 0 ja 100% vahele."
+        )
+      ),
+      selectInput("aasta", "Vali võrreldav aasta", choices = available_years, selected = max(available_years, na.rm = TRUE)),
+      actionButton("leia", "LEIA SARNASED", class = "btn-primary"),
+      hr(),
+      htmlOutput("nouded")
+    )
   })
-  
+
+  # ---- similar companies ---------------------------------------------------
+  similar_companies <- eventReactive(input$leia, {
+    target <- selected_company_year()
+    req(nrow(target) == 1)
+
+    candidates <- company_year_ds %>%
+      filter(aasta == input$aasta, registrikood != input$company_id)
+
+    if (isTRUE(input$sektor) && !is.na(target$emtaktahttekst)) {
+      candidates <- candidates %>% filter(emtaktahttekst == target$emtaktahttekst)
+    }
+
+    if (isTRUE(input$emtak2) && !is.na(target$emtak2)) {
+      candidates <- candidates %>% filter(emtak2 == target$emtak2)
+    } else if (isTRUE(input$emtak2) && !is.na(target$emtak2tekst)) {
+      candidates <- candidates %>% filter(emtak2tekst == target$emtak2tekst)
+    }
+
+    if (isTRUE(input$maakond)) {
+      counties <- unique(c(target$maakond, input$maakond2))
+      counties <- counties[!is.na(counties) & counties != ""]
+      if (length(counties) > 0) {
+        candidates <- candidates %>% filter(maakond %in% counties)
+      }
+    }
+
+    if (isTRUE(input$kaive) && !is.na(target$kaive)) {
+      candidates <- candidates %>%
+        filter(
+          kaive >= target$kaive * (1 - input$dkaive / 100),
+          kaive <= target$kaive * (1 + input$dkaive / 100)
+        )
+    }
+
+    if (isTRUE(input$tootajad) && !is.na(target$tootajad)) {
+      candidates <- candidates %>%
+        filter(
+          tootajad >= target$tootajad * (1 - input$dtootajad / 100),
+          tootajad <= target$tootajad * (1 + input$dtootajad / 100)
+        )
+    }
+
+    candidates %>%
+      select(registrikood, nimi, aasta, maakond, emtak, emtak2, kaive, tootajad) %>%
+      arrange(nimi) %>%
+      collect()
+  })
+
+  chart_data <- reactive({
+    sims <- similar_companies()
+    target <- selected_company()
+    req(input$aasta, nrow(target) == 1)
+
+    needed_ids <- unique(c(target$registrikood, sims$registrikood))
+
+    raw <- emta_quarterly_ds %>%
+      filter(aasta >= input$aasta, registrikood %in% needed_ids) %>%
+      select(registrikood, nimi, aasta, kvartal, rmaksud, toomaksud, kaive, tootajad) %>%
+      collect() %>%
+      add_derived_metrics()
+
+    mine <- raw %>%
+      filter(registrikood == target$registrikood) %>%
+      mutate(grupp = target$nimi)
+
+    similar_avg <- raw %>%
+      filter(registrikood %in% sims$registrikood) %>%
+      group_by(aasta, kvartal, aeg) %>%
+      summarise(
+        across(c(rmaksud, toomaksud, kaive, tootajad, kaive_tootaja, tmaksud_tootaja, rmaksud_kaive, tmaksud_kaive), ~ mean(.x, na.rm = TRUE)),
+        .groups = "drop"
+      ) %>%
+      mutate(grupp = "Sarnased ettevõtted")
+
+    bind_rows(similar_avg, mine %>% select(names(similar_avg))) %>%
+      arrange(aeg, grupp)
+  })
+
+  # ---- text outputs --------------------------------------------------------
+  output$main_content <- renderUI({
+    if (is.null(input$company_id) || input$company_id == "") {
+      return(HTML("<h3>Lisainfo</h3><p>Vali ettevõte, seejärel määra sarnasuse tingimused.</p>"))
+    }
+
+    tagList(
+      h3("Sarnased ettevõtted"),
+      htmlOutput("nimekiri"),
+      br(),
+      htmlOutput("bench"),
+      hr(),
+      withSpinner(plotlyOutput("jooniskaive")),
+      withSpinner(plotlyOutput("joonistootajad")),
+      withSpinner(plotlyOutput("jooniskaive_tootaja")),
+      withSpinner(plotlyOutput("joonistmaksud_tootaja")),
+      withSpinner(plotlyOutput("joonisrmaksud_kaive")),
+      withSpinner(plotlyOutput("joonistmaksud_kaive")),
+      withSpinner(plotlyOutput("joonisrmaksud")),
+      withSpinner(plotlyOutput("joonistmaksud")),
+      htmlOutput("seletus")
+    )
+  })
+
+  output$nouded <- renderUI({
+    req(selected_company_year())
+    target <- selected_company_year()
+
+    txt <- "Ettevõtted on sarnased, kui on täidetud järgmised nõuded:"
+
+    if (isTRUE(input$sektor)) {
+      txt <- paste(txt, paste("<b>Sektor:</b>", safe_one(target$emtaktahttekst)), sep = "<br/>")
+    }
+    if (isTRUE(input$emtak2)) {
+      emtak2_label <- if ("emtak2tekst" %in% names(target)) safe_one(target$emtak2tekst) else safe_one(target$emtak2)
+      txt <- paste(txt, paste("<b>EMTAK2:</b>", emtak2_label), sep = "<br/>")
+    }
+    if (isTRUE(input$maakond)) {
+      txt <- paste(txt, paste("<b>Maakond:</b>", paste(unique(c(target$maakond, input$maakond2)), collapse = ", ")), sep = "<br/>")
+    }
+    if (isTRUE(input$kaive)) {
+      txt <- paste(txt, paste0(
+        "<b>Käive:</b> ",
+        fmt_num(target$kaive * (1 - input$dkaive / 100)), " - ",
+        fmt_num(target$kaive * (1 + input$dkaive / 100)), " €"
+      ), sep = "<br/>")
+    }
+    if (isTRUE(input$tootajad)) {
+      txt <- paste(txt, paste0(
+        "<b>Töötajad:</b> ",
+        fmt_num(target$tootajad * (1 - input$dtootajad / 100), 1), " - ",
+        fmt_num(target$tootajad * (1 + input$dtootajad / 100), 1)
+      ), sep = "<br/>")
+    }
+
+    txt <- paste(txt, paste("<b>Võrdlusaasta:</b>", input$aasta), sep = "<br/>")
+    HTML(txt)
+  })
+
+  output$nimekiri <- renderUI({
+    req(similar_companies())
+    sims <- similar_companies()
+
+    if (nrow(sims) == 0) {
+      return(HTML("Sellistel tingimustel sarnaseid ei leitud."))
+    }
+
+    HTML(paste0(
+      "Leiti <b>", nrow(sims), "</b> sarnast ettevõtet.<br/><br/>",
+      paste(head(sims$nimi, 100), collapse = "<br/>"),
+      if (nrow(sims) > 100) "<br/>..." else ""
+    ))
+  })
+
   output$bench <- renderUI({
-    if (nrow(sarnased_reg()) != 0) {
-    HTML("Vaata ettevõtteid lähemalt <a href='https://annegrete.ee/shiny/benchmarking_EMTA/' target='_blank'>ajaloo võrdluse rakendusest</a>.")
+    req(similar_companies())
+    if (nrow(similar_companies()) > 0) {
+      HTML("Vaata ettevõtteid lähemalt <a href='https://annegrete.ee/shiny/benchmarking_EMTA/' target='_blank'>ajaloo võrdluse rakendusest</a>.")
     }
   })
-  
-  # Joonised ----------------------------------------------------------------
+
+  output$seletus <- renderUI({
+    HTML("<h3>Lisainfo</h3>
+         <p>Rakendus otsib valitud ettevõttele sarnaseid ettevõtteid valitud aasta põhjal.
+         Sarnasust saab piirata sektori, EMTAK2, maakonna, käibe ja töötajate arvu järgi.
+         Joonistel võrreldakse valitud ettevõtet sarnaste ettevõtete keskmisega alates valitud aastast.</p>")
+  })
+
+  # ---- plots ---------------------------------------------------------------
   output$jooniskaive <- renderPlotly({
-    skaala <- kymne_aste(andmed_joonis()$kaive)
-    p <- ggplot(andmed_joonis(), 
-                aes(aeg, kaive/skaala$div, color = grupp, group = grupp,
-                    text = paste0(grupp, "\n", aeg, "\nKäive: ", 
-                                  prettyNum(kaive, big.mark = " "), " €"))) + 
-      geom_line() + 
-      geom_point(size = 0.8) + 
-      theme_bw() + 
-      labs(title = "Käive", x = "", y = paste0("€ ", skaala$label)) + 
-      guides(color = guide_legend(title = NULL)) + 
-      scale_x_yearqtr(format = "%Y Q%q") + 
-      expand_limits(y = 0) 
-    ggplotly(p, tooltip = "text") #%>% config(displayModeBar = F)
+    plot_metric(chart_data(), "kaive", "Käive", unit = "€")
   })
-  
+
   output$joonistootajad <- renderPlotly({
-    p <- ggplot(andmed_joonis(), 
-                aes(aeg, tootajad, color = grupp, group = grupp,
-                    text = paste0(grupp, "\n", aeg, "\nTöötajate arv: ", tootajad))) + 
-      geom_line() + 
-      geom_point(size = 0.8) + 
-      theme_bw() + 
-      labs(title = "Töötajate arv", x = "", y = "") + 
-      guides(color = guide_legend(title = NULL)) + 
-      scale_x_yearqtr(format = "%Y Q%q") + 
-      expand_limits(y = 0) 
-    ggplotly(p, tooltip = "text") #%>% config(displayModeBar = F)
+    plot_metric(chart_data(), "tootajad", "Töötajate arv")
   })
-  
+
   output$jooniskaive_tootaja <- renderPlotly({
-    skaala <- kymne_aste(andmed_joonis()$kaive_tootaja)
-    p <- ggplot(andmed_joonis(), 
-                aes(aeg, kaive_tootaja/skaala$div, color = grupp, group = grupp,
-                    text = paste0(grupp, "\n", aeg, "\nKäive töötaja kohta: ", 
-                                  prettyNum(kaive_tootaja, big.mark = " "), " €"))) + 
-      geom_line() + 
-      geom_point(size = 0.8) + 
-      theme_bw() + 
-      labs(title = "Käive töötaja kohta", x = "", y = paste0("€ ", skaala$label)) + 
-      guides(color = guide_legend(title = NULL)) + 
-      scale_x_yearqtr(format = "%Y Q%q") + 
-      expand_limits(y = 0) 
-    ggplotly(p, tooltip = "text") #%>% config(displayModeBar = F)
+    plot_metric(chart_data(), "kaive_tootaja", "Käive töötaja kohta", unit = "€")
   })
-  
+
   output$joonistmaksud_tootaja <- renderPlotly({
-    skaala <- kymne_aste(andmed_joonis()$tmaksud_tootaja)
-    p <- ggplot(andmed_joonis(), 
-                aes(aeg, tmaksud_tootaja/skaala$div, color = grupp, group = grupp,
-                    text = paste0(grupp, "\n", aeg, "\nTööjõumaksud töötaja kohta: ", 
-                                  prettyNum(tmaksud_tootaja, big.mark = " "), " €"))) + 
-      geom_line() + 
-      geom_point(size = 0.8) + 
-      theme_bw() + 
-      labs(title = "Tööjõumaksud töötaja kohta", x = "", y = paste0("€ ", skaala$label)) + 
-      guides(color = guide_legend(title = NULL)) + 
-      scale_x_yearqtr(format = "%Y Q%q") + 
-      expand_limits(y = 0) 
-    ggplotly(p, tooltip = "text") #%>% config(displayModeBar = F)
+    plot_metric(chart_data(), "tmaksud_tootaja", "Tööjõumaksud töötaja kohta", unit = "€")
   })
-  
+
   output$joonisrmaksud_kaive <- renderPlotly({
-    p <- ggplot(andmed_joonis(), 
-                aes(aeg, rmaksud_kaive, color = grupp, group = grupp,
-                    text = paste0(grupp, "\n", aeg, "\nRiiklikud maksud käibest: ", 
-                                  rmaksud_kaive, "%"))) + 
-      geom_line() + 
-      geom_point(size = 0.8) + 
-      theme_bw() + 
-      labs(title = "Riiklikud maksud käibest", x = "", y = "%") + 
-      guides(color = guide_legend(title = NULL)) + 
-      scale_x_yearqtr(format = "%Y Q%q") + 
-      expand_limits(y = 0) 
-    ggplotly(p, tooltip = "text") #%>% config(displayModeBar = F)
+    plot_metric(chart_data(), "rmaksud_kaive", "Riiklikud maksud käibest", percent = TRUE)
   })
-  
+
   output$joonistmaksud_kaive <- renderPlotly({
-    p <- ggplot(andmed_joonis(), 
-                aes(aeg, tmaksud_kaive, color = grupp, group = grupp,
-                    text = paste0(grupp, "\n", aeg, "\nTööjõumaksud käibest: ", 
-                                  tmaksud_kaive, "%"))) + 
-      geom_line() + 
-      geom_point(size = 0.8) + 
-      theme_bw() + 
-      labs(title = "Tööjõumaksud käibest", x = "", y ="%") + 
-      guides(color = guide_legend(title = NULL)) + 
-      scale_x_yearqtr(format = "%Y Q%q") + 
-      expand_limits(y = 0) 
-    ggplotly(p, tooltip = "text") #%>% config(displayModeBar = F)
+    plot_metric(chart_data(), "tmaksud_kaive", "Tööjõumaksud käibest", percent = TRUE)
   })
-  
+
   output$joonisrmaksud <- renderPlotly({
-    skaala <- kymne_aste(andmed_joonis()$rmaksud)
-    p <- ggplot(andmed_joonis(), 
-                aes(aeg, rmaksud/skaala$div, color = grupp, group = grupp,
-                    text = paste0(grupp, "\n", aeg, "\nRiiklikud maksud: ", 
-                                  prettyNum(rmaksud, big.mark = " "), " €"))) + 
-      geom_line() + 
-      geom_point(size = 0.8) + 
-      theme_bw() + 
-      labs(title = "Riiklikud maksud", x = "", y = paste0("€ ", skaala$label)) + 
-      guides(color = guide_legend(title = NULL)) + 
-      scale_x_yearqtr(format = "%Y Q%q") + 
-      expand_limits(y = 0) 
-    ggplotly(p, tooltip = "text") #%>% config(displayModeBar = F)
+    plot_metric(chart_data(), "rmaksud", "Riiklikud maksud", unit = "€")
   })
-  
+
   output$joonistmaksud <- renderPlotly({
-    skaala <- kymne_aste(andmed_joonis()$toomaksud)
-    p <- ggplot(andmed_joonis(), 
-                aes(aeg, toomaksud/skaala$div, color = grupp, group = grupp,
-                    text = paste0(grupp, "\n", aeg, "\nTööjõumaksud: ", 
-                                  prettyNum(toomaksud, big.mark = " "), " €"))) + 
-      geom_line() + 
-      geom_point(size = 0.8) + 
-      theme_bw() + 
-      labs(title = "Tööjõumaksud", x = "", y = paste0("€ ", skaala$label)) + 
-      guides(color = guide_legend(title = NULL)) + 
-      scale_x_yearqtr(format = "%Y Q%q") + 
-      expand_limits(y = 0) 
-    ggplotly(p, tooltip = "text") #%>% config(displayModeBar = F)
+    plot_metric(chart_data(), "toomaksud", "Tööjõumaksud", unit = "€")
   })
-  
-  
-  
-  
 })

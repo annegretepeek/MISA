@@ -25,6 +25,7 @@ kvartal2 <- case_when(kuu == 1 ~ 4,
 aasta <- year(Sys.Date())
 #aasta <- 2020
 aasta <- ifelse(kuu == 1, aasta - 1, aasta)
+#URL katki
 url1 <- paste("https://www.emta.ee/sites/default/files/kontaktid-ja-ametist/maksulaekumine-statistika/tasutud-maksud/tasutud_maksud",
              aasta, kvartal, "kvartal.xlsx", 
              sep = "_")
@@ -37,7 +38,8 @@ dt1 <- read_excel(tf)
 
 
 # Andmete töötlemine -----------------------------------------------------------
-load("C:/Users/annegrete.peek/Documents/EMTA/MISA/andmed/andmed_emta.RData")  
+#load("C:/Users/annegrete.peek/Documents/EMTA/MISA/andmed/andmed_emta.RData")  
+load("C:/Users/apeek/DocumentsEMTA/MISA/andmed/andmed_emta.RData") 
 
 names(dt1) <- c("registrikood", "nimi", "liik", "KMK", "EMTAK", "aadress", "rmaksud", "toomaksud", "kaive", "tootajad")
 
@@ -58,3 +60,38 @@ andmed_emta <- dt1 %>%
   rbind(andmed_emta)
 
 save(andmed_emta, file = "C:/Users/annegrete.peek/Documents/EMTA/MISA/andmed/andmed_emta.RData")  
+
+
+for (i in 2021:2023) {
+  for (j in c("i", "ii", "iii", "iv")) {
+    
+    fail <- paste("EMTA/MISA/andmed/tasutud_maksud", i, j, "kvartal.xlsx", sep = "_")
+    print(fail)
+    
+    dt1 <- read_excel(fail)
+    
+    names(dt1) <- c("registrikood", "nimi", "liik", "KMK", "EMTAK", "aadress", "rmaksud", "toomaksud", "kaive", "tootajad")
+
+    kvartal2 <- case_when(j == "i" ~ 1,
+                          j == "ii" ~ 2,
+                          j == "iii" ~ 3,
+                          j == "iv" ~ 4
+    )
+    
+    dt1 <- dt1 %>%
+      mutate(
+        aeg = as.yearqtr(paste(i, kvartal2, sep = "-")),
+        rmaksud_kaive = round(rmaksud/kaive*100, 1),
+        tmaksud_kaive = round(toomaksud/kaive*100, 1),
+        kaive_tootaja = round(kaive/tootajad, 1),
+        tmaksud_tootaja = round(toomaksud/tootajad, 1),
+        maakond = stringr::word(aadress, sep = fixed(" "))
+      ) %>%
+      mutate_at(vars(rmaksud, toomaksud, kaive, tootajad), missingtozero) %>% 
+      arrange(desc(aeg), desc(kaive)) %>%
+      select(names(andmed_emta)) 
+    
+    andmed_emta <- dt1 %>% 
+      rbind(andmed_emta)
+  }
+}
