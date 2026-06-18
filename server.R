@@ -3,11 +3,12 @@
 shinyServer(function(input, output, session) {
 
   # ---- company selector ----------------------------------------------------
-  observe({
+  observeEvent(TRUE, {
     updateSelectizeInput(
       session = session,
       inputId = "company_id",
       choices = setNames(ettevotted$value, ettevotted$label),
+      selected = "",
       server = TRUE,
       options = list(
         placeholder = "Alusta ettevõtte nime kirjutamist...",
@@ -28,8 +29,11 @@ shinyServer(function(input, output, session) {
   selected_company_year <- reactive({
     req(input$company_id, input$aasta)
 
+    company_id <- as.character(input$company_id)
+    aasta_val <- as.integer(input$aasta)
+
     company_year_ds %>%
-      filter(registrikood == input$company_id, aasta == input$aasta) %>%
+      filter(registrikood == company_id, aasta == aasta_val) %>%
       collect() %>%
       slice(1)
   })
@@ -85,47 +89,53 @@ shinyServer(function(input, output, session) {
     target <- selected_company_year()
     req(nrow(target) == 1)
 
+    company_id <- as.character(input$company_id)
+    aasta_val <- as.integer(input$aasta)
+
     candidates <- company_year_ds %>%
-      filter(aasta == input$aasta, registrikood != input$company_id)
+      filter(aasta == aasta_val) %>%
+      collect() %>%
+      filter(registrikood != company_id)
 
-    if (isTRUE(input$sektor) && !is.na(target$emtaktahttekst)) {
-      candidates <- candidates %>% filter(emtaktahttekst == target$emtaktahttekst)
+   if (isTRUE(input$sektor) && !is.na(target$emtak[[1]])) {
+      sektor_val <- target$emtak[[1]]
+      candidates <- candidates %>% filter(emtak == sektor_val)
     }
 
-    if (isTRUE(input$emtak2) && !is.na(target$emtak2)) {
-      candidates <- candidates %>% filter(emtak2 == target$emtak2)
-    } else if (isTRUE(input$emtak2) && !is.na(target$emtak2tekst)) {
-      candidates <- candidates %>% filter(emtak2tekst == target$emtak2tekst)
-    }
+    if (isTRUE(input$emtak2) && "emtak2" %in% names(target) && !is.na(target$emtak2[[1]])) {
+      emtak2_val <- target$emtak2[[1]]
+      candidates <- candidates %>% filter(emtak2 == emtak2_val)
+    } 
 
     if (isTRUE(input$maakond)) {
-      counties <- unique(c(target$maakond, input$maakond2))
+      counties <- unique(c(target$maakond[[1]], input$maakond2))
       counties <- counties[!is.na(counties) & counties != ""]
       if (length(counties) > 0) {
         candidates <- candidates %>% filter(maakond %in% counties)
       }
     }
 
-    if (isTRUE(input$kaive) && !is.na(target$kaive)) {
+    if (isTRUE(input$kaive) && !is.na(target$kaive[[1]])) {
+      kaive_val <- target$kaive[[1]]
       candidates <- candidates %>%
         filter(
-          kaive >= target$kaive * (1 - input$dkaive / 100),
-          kaive <= target$kaive * (1 + input$dkaive / 100)
+          kaive >= kaive_val * (1 - input$dkaive / 100),
+          kaive <= kaive_val * (1 + input$dkaive / 100)
         )
     }
 
-    if (isTRUE(input$tootajad) && !is.na(target$tootajad)) {
+    if (isTRUE(input$tootajad) && !is.na(target$tootajad[[1]])) {
+      tootajad_val <- target$tootajad[[1]]
       candidates <- candidates %>%
         filter(
-          tootajad >= target$tootajad * (1 - input$dtootajad / 100),
-          tootajad <= target$tootajad * (1 + input$dtootajad / 100)
+          tootajad >= tootajad_val * (1 - input$dtootajad / 100),
+          tootajad <= tootajad_val * (1 + input$dtootajad / 100)
         )
     }
 
     candidates %>%
-      select(registrikood, nimi, aasta, maakond, emtak, emtak2, kaive, tootajad) %>%
-      arrange(nimi) %>%
-      collect()
+      select(any_of(c("registrikood", "nimi", "aasta", "maakond", "emtak", "emtak2", "emtak2tekst", "kaive", "tootajad"))) %>%
+      arrange(nimi)
   })
 
   chart_data <- reactive({
@@ -133,10 +143,11 @@ shinyServer(function(input, output, session) {
     target <- selected_company()
     req(input$aasta, nrow(target) == 1)
 
+    aasta_val <- as.integer(input$aasta)
     needed_ids <- unique(c(target$registrikood, sims$registrikood))
 
     raw <- emta_quarterly_ds %>%
-      filter(aasta >= input$aasta, registrikood %in% needed_ids) %>%
+      filter(aasta >= aasta_val, registrikood %in% needed_ids) %>%
       select(registrikood, nimi, aasta, kvartal, rmaksud, toomaksud, kaive, tootajad) %>%
       collect() %>%
       add_derived_metrics()
@@ -189,7 +200,7 @@ shinyServer(function(input, output, session) {
     txt <- "Ettevõtted on sarnased, kui on täidetud järgmised nõuded:"
 
     if (isTRUE(input$sektor)) {
-      txt <- paste(txt, paste("<b>Sektor:</b>", safe_one(target$emtaktahttekst)), sep = "<br/>")
+      txt <- paste(txt, paste("<b>Sektor:</b>", safe_one(target$emtak)), sep = "<br/>")
     }
     if (isTRUE(input$emtak2)) {
       emtak2_label <- if ("emtak2tekst" %in% names(target)) safe_one(target$emtak2tekst) else safe_one(target$emtak2)
@@ -220,16 +231,27 @@ shinyServer(function(input, output, session) {
   output$nimekiri <- renderUI({
     req(similar_companies())
     sims <- similar_companies()
-
+    
     if (nrow(sims) == 0) {
       return(HTML("Sellistel tingimustel sarnaseid ei leitud."))
     }
-
-    HTML(paste0(
-      "Leiti <b>", nrow(sims), "</b> sarnast ettevõtet.<br/><br/>",
-      paste(head(sims$nimi, 100), collapse = "<br/>"),
-      if (nrow(sims) > 100) "<br/>..." else ""
-    ))
+    
+    tagList(
+      HTML(paste0("Leiti <b>", nrow(sims), "</b> sarnast ettevõtet.<br/><br/>")),
+      tags$div(
+        style = "
+        column-count: 3;
+        column-gap: 30px;
+      ",
+        lapply(head(sims$nimi, 100), function(x) {
+          tags$div(
+            style = "break-inside: avoid; margin-bottom: 4px;",
+            x
+          )
+        })
+      ),
+      if (nrow(sims) > 100) HTML("<br/>...") else NULL
+    )
   })
 
   output$bench <- renderUI({
