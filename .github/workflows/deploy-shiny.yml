@@ -23,10 +23,7 @@ jobs:
             
       - name: Install R packages
         run: |
-            install.packages(c(
-                "rsconnect",
-                "httr",
-                "jsonlite",
+            Rscript -e 'install.packages(c(
                 "arrow",
                 "dplyr",
                 "ggplot2",
@@ -41,7 +38,7 @@ jobs:
                 "stringr",
                 "tidyverse",
                 "zoo"
-            ), repos = "https://cloud.r-project.org")
+            ), repos = "https://cloud.r-project.org")'
 
       - name: Rebuild data
         env:
