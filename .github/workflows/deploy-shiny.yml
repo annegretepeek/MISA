@@ -21,6 +21,21 @@ jobs:
             any::httr
             any::jsonlite
             
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+          libuv1-dev \
+          libfontconfig1-dev \
+          libfreetype6-dev \
+          libharfbuzz-dev \
+          libfribidi-dev \
+          libcurl4-openssl-dev \
+          libssl-dev \
+          libxml2-dev \
+          libgit2-dev \
+          libglpk-dev
+
       - name: Install R packages
         run: |
             Rscript -e 'install.packages(c(
@@ -36,7 +51,6 @@ jobs:
                 "shinyjs",
                 "shinyWidgets",
                 "stringr",
-                "tidyverse",
                 "zoo"
             ), repos = "https://cloud.r-project.org")'
 
