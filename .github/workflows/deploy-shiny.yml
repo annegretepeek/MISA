@@ -62,6 +62,6 @@ jobs:
             secret = Sys.getenv("SHINYAPPS_SECRET")
           ); rsconnect::deployApp(
             appDir = ".",
-            appFiles = c("ui.R", "server.R", "global.R", "www", "data"),
+            appFiles = c("ui.R", "server.R", "global.R", "packages.R", "www", "data"),
             forceUpdate = TRUE
           )'
