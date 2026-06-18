@@ -44,8 +44,7 @@ download_file <- function(repo_path, dest_file) {
   
   message("Downloaded: ", repo_path)
 }
-
-download_parquet_folder <- function(repo_folder, dest_folder) {
+download_github_folder <- function(repo_folder, dest_folder) {
   
   api_url <- paste0(
     "https://api.github.com/repos/",
@@ -55,29 +54,30 @@ download_parquet_folder <- function(repo_folder, dest_folder) {
   )
   
   res <- GET(api_url, github_headers)
-  
   stop_for_status(res)
   
   files <- fromJSON(
     content(res, "text", encoding = "UTF-8")
   )
   
-  parquet_files <- files[
-    files$type == "file" &
-      grepl("\\.parquet$", files$name),
-  ]
+  dir.create(dest_folder, recursive = TRUE, showWarnings = FALSE)
   
-  dir.create(dest_folder,
-             recursive = TRUE,
-             showWarnings = FALSE)
-  
-  for(i in seq_len(nrow(parquet_files))) {
+  for (i in seq_len(nrow(files))) {
     
-    download_file(
-      parquet_files$path[i],
-      file.path(dest_folder,
-                parquet_files$name[i])
-    )
+    if (files$type[i] == "file" && grepl("\\.parquet$", files$name[i])) {
+      
+      download_file(
+        files$path[i],
+        file.path(dest_folder, files$name[i])
+      )
+      
+    } else if (files$type[i] == "dir") {
+      
+      download_github_folder(
+        files$path[i],
+        file.path(dest_folder, files$name[i])
+      )
+    }
   }
 }
 
@@ -95,13 +95,13 @@ download_file(
 # Download dataset folders
 # ----------------------------
 
-download_parquet_folder(
+download_github_folder(
   "data/apps/company_year",
   file.path(dest_root,
             "company_year")
 )
 
-download_parquet_folder(
+download_github_folder(
   "data/apps/emta_quarterly",
   file.path(dest_root,
             "emta_quarterly")
