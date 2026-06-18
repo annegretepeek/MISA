@@ -20,11 +20,38 @@ jobs:
             any::rsconnect
             any::httr
             any::jsonlite
+            
+      - name: Install R packages
+        run: |
+            install.packages(c(
+                "rsconnect",
+                "httr",
+                "jsonlite",
+                "arrow",
+                "dplyr",
+                "ggplot2",
+                "htmltools",
+                "lubridate",
+                "plotly",
+                "readxl",
+                "shiny",
+                "shinycssloaders",
+                "shinyjs",
+                "shinyWidgets",
+                "stringr",
+                "tidyverse",
+                "zoo"
+            ), repos = "https://cloud.r-project.org")
 
       - name: Rebuild data
         env:
           GITHUB_PAT: ${{ secrets.DATA_REPO_PAT  }}
         run: Rscript data_download.R
+      
+      - name: Check downloaded data
+        run: |
+            find data -type f | head
+            du -sh data
 
       - name: Deploy to shinyapps.io
         env:
