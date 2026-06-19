@@ -1,0 +1,13 @@
+name: MISA
+title: MISA
+username: annegretepeek
+account: annegretepeek
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 17526267
+bundleId: 12144061
+url: https://annegretepeek.shinyapps.io/MISA/
+version: 1
+asMultiple: FALSE
+asStatic: FALSE
+ignoredFiles: .Renviron|README.txt|andmed|v1
