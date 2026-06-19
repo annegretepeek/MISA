@@ -77,5 +77,6 @@ jobs:
           ); rsconnect::deployApp(
             appDir = ".",
             appFiles = c("ui.R", "server.R", "global.R", "packages.R", "www", "data"),
-            forceUpdate = TRUE
+            forceUpdate = TRUE,
+            logLevel = "verbose"
           )'
