@@ -36,6 +36,7 @@ jobs:
       - name: Install R packages
         run: |
             Rscript -e 'install.packages(c(
+                "rsconnect",
                 "arrow",
                 "dplyr",
                 "ggplot2",
