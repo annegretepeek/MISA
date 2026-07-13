@@ -257,7 +257,7 @@ shinyServer(function(input, output, session) {
   output$bench <- renderUI({
     req(similar_companies())
     if (nrow(similar_companies()) > 0) {
-      HTML("Vaata ettevõtteid lähemalt <a href='https://annegrete.ee/shiny/benchmarking_EMTA/' target='_blank'>ajaloo võrdluse rakendusest</a>.")
+      HTML("Vaata ettevõtteid lähemalt <a href='https://annegretemolloka.shinyapps.io/benchmarking_emta/' target='_blank'>ajaloo võrdluse rakendusest</a>.")
     }
   })
 
