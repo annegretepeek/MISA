@@ -26,6 +26,24 @@ shinyServer(function(input, output, session) {
       slice(1)
   })
 
+   selected_company_years <- reactive({
+    req(input$company_id)
+
+    company_id <- as.character(input$company_id)
+
+    years <- company_year_ds %>%
+      filter(registrikood == company_id) %>%
+      distinct(aasta) %>%
+      collect() %>%
+      filter(!is.na(aasta)) %>%
+      arrange(desc(aasta)) %>%
+      pull(aasta)
+
+    req(length(years) > 0)
+
+    years
+  })
+
   selected_company_year <- reactive({
     req(input$company_id, input$aasta)
 
@@ -41,6 +59,8 @@ shinyServer(function(input, output, session) {
   # ---- controls ------------------------------------------------------------
   output$similarity_controls <- renderUI({
     req(selected_company())
+
+    company_years <- selected_company_years()
 
     plusmiinus <- "\u00b1"
     company_county <- selected_company()$maakond
@@ -77,7 +97,7 @@ shinyServer(function(input, output, session) {
           help_text = "Arv peaks jääma 0 ja 100% vahele."
         )
       ),
-      selectInput("aasta", "Vali võrreldav aasta", choices = available_years, selected = max(available_years, na.rm = TRUE)),
+      selectInput("aasta", "Vali võrreldav aasta", choices = company_years, selected = max(company_years, na.rm = TRUE)),
       actionButton("leia", "LEIA SARNASED", class = "btn-primary"),
       hr(),
       htmlOutput("nouded")

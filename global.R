@@ -24,7 +24,7 @@ active_companies <- read_parquet(PATH_ACTIVE_COMPANIES) %>%
   mutate(registrikood = as.character(registrikood)) %>%
   arrange(nimi)
 
-company_year_ds <- open_dataset(PATH_COMPANY_YEAR)
+company_year_ds <- open_dataset(PATH_COMPANY_YEAR) 
 emta_quarterly_ds <- open_dataset(PATH_EMTA_QUARTERLY)
 
 maakonnad <- active_companies %>%
@@ -35,12 +35,6 @@ maakonnad <- active_companies %>%
 
 ettevotted <- active_companies %>%
   transmute(label = paste0(nimi, " (", registrikood, ")"), value = registrikood)
-
-available_years <- company_year_ds %>%
-  distinct(aasta) %>%
-  collect() %>%
-  arrange(desc(aasta)) %>%
-  pull(aasta)
 
 # ---- helpers ---------------------------------------------------------------
 fmt_num <- function(x, digits = 0) {
